@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from urllib.parse import parse_qs
 
@@ -12,6 +13,7 @@ from fhir_backend_auth.auth.jwk_manager import JWT_ALGORITHM, JWKManager
 from fhir_backend_auth.auth.oauth_client import create_oauth_client
 from fhir_backend_auth.auth.token_client import TokenClient
 from fhir_backend_auth.config import Settings
+from fhir_backend_auth.http_logging import logger as http_logging_logger
 
 TOKEN_ENDPOINT = "https://epic.example.com/oauth2/token"
 
@@ -99,6 +101,34 @@ async def test_token_request_uses_rs384_private_key_jwt(
     assert decoded["sub"] == settings.oauth_client_id
     assert decoded["aud"] == TOKEN_ENDPOINT
     assert "jti" in decoded
+
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_token_request_logs_request_and_response_on_error(
+    settings, jwk_manager, fake_redis, caplog
+):
+    async def handler(request):
+        return httpx.Response(
+            400,
+            json={"error": "invalid_client", "error_description": "bad jwt"},
+            headers={"Content-Type": "application/json"},
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
+
+    with caplog.at_level(logging.INFO, logger=http_logging_logger.name):
+        with pytest.raises(Exception):
+            await client.get_access_token()
+
+    log_text = caplog.text
+    assert "Token request: POST" in log_text
+    assert TOKEN_ENDPOINT in log_text
+    assert "grant_type=client_credentials" in log_text
+    assert "Token response: 400" in log_text
+    assert "invalid_client" in log_text
 
     await client.close()
 

@@ -5,9 +5,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 import fhir_backend_auth.extensions as ext
-from fhir_backend_auth.api import fhir as fhir_api
 from fhir_backend_auth.app import create_app
 from fhir_backend_auth.auth.oauth_client import create_oauth_client
+from fhir_backend_auth.http_logging import logger as http_logging_logger
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ async def test_fhir_proxy_logs_upstream_request_and_response_headers(
     app.state.http_client = mock_http_client
 
     upstream_url = f"{settings.upstream_fhir_url.rstrip('/')}/metadata"
-    with caplog.at_level(logging.INFO, logger=fhir_api.logger.name):
+    with caplog.at_level(logging.INFO, logger=http_logging_logger.name):
         response = await client.get("/fhir/metadata")
 
     assert response.status_code == 200

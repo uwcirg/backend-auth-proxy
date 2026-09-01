@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, Response
 
 from fhir_backend_auth.auth.token_client import TokenClient
 from fhir_backend_auth.config import Settings
+from fhir_backend_auth.http_logging import log_http_request, log_http_response
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,6 @@ FORWARD_RESPONSE_HEADERS = {
 }
 
 
-def _headers_for_log(headers: httpx.Headers | dict[str, str]) -> dict[str, str]:
-    return {name.lower(): value for name, value in headers.items()}
-
-
 def _build_upstream_request_url(upstream_url: str, params: httpx.QueryParams) -> str:
     return str(httpx.URL(upstream_url).copy_merge_params(params=params))
 
@@ -36,20 +33,11 @@ def _log_upstream_request(
     url: str,
     headers: dict[str, str],
 ) -> None:
-    logger.info(
-        "Upstream request: %s %s headers=%s",
-        method,
-        url,
-        _headers_for_log(headers),
-    )
+    log_http_request("Upstream", method, url, headers)
 
 
 def _log_upstream_response(response: httpx.Response) -> None:
-    logger.info(
-        "Upstream response: %s headers=%s",
-        response.status_code,
-        _headers_for_log(response.headers),
-    )
+    log_http_response("Upstream", response, response.content)
 
 
 @router.api_route(
