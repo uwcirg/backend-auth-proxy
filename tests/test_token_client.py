@@ -44,10 +44,12 @@ async def fake_redis():
 
 
 def _make_token_client(settings, jwk_manager, fake_redis, transport=None):
+    kid = jwk_manager.get_kid()
     oauth_client = create_oauth_client(
         settings,
         jwk_manager.get_private_key_pem(),
         TOKEN_ENDPOINT,
+        kid,
         transport=transport,
     )
     return TokenClient(
@@ -92,6 +94,7 @@ async def test_token_request_uses_rs384_private_key_jwt(
     header = decoded.header
 
     assert header["alg"] == JWT_ALGORITHM
+    assert header["kid"] == jwk_manager.get_kid()
     assert decoded["iss"] == settings.oauth_client_id
     assert decoded["sub"] == settings.oauth_client_id
     assert decoded["aud"] == TOKEN_ENDPOINT

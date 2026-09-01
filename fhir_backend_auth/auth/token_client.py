@@ -34,10 +34,12 @@ class TokenClient:
         self.jwk_manager = jwk_manager
         self.redis = redis
         self._token_endpoint = token_endpoint
+        kid = jwk_manager.get_kid()
         self._oauth_client = oauth_client or create_oauth_client(
             settings,
             jwk_manager.get_private_key_pem(),
             token_endpoint,
+            kid,
         )
         self._owns_client = oauth_client is None
 

@@ -122,13 +122,18 @@ class JWKManager:
             self._jwk_dict = key.as_dict(is_private=False)
         return self._jwk_dict
 
-    def get_jwks(self) -> dict:
+    def get_kid(self) -> str:
         jwk_dict = self.get_jwk_dict()
         if "kid" not in jwk_dict:
             key_str = json.dumps(jwk_dict, sort_keys=True)
             jwk_dict["kid"] = hashlib.sha256(
                 key_str.encode()
             ).hexdigest()[:16]
+        return jwk_dict["kid"]
+
+    def get_jwks(self) -> dict:
+        jwk_dict = dict(self.get_jwk_dict())
+        jwk_dict["kid"] = self.get_kid()
         jwk_dict["alg"] = JWT_ALGORITHM
         jwk_dict["use"] = "sig"
         return {"keys": [jwk_dict]}

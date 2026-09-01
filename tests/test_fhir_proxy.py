@@ -114,6 +114,7 @@ async def test_fhir_proxy_retries_on_401(app_client):
         settings,
         app.state.jwk_manager.get_private_key_pem(),
         settings.upstream_token_url,
+        app.state.jwk_manager.get_kid(),
         transport=token_transport,
     )
     app.state.token_client._owns_client = True
