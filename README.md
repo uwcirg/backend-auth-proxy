@@ -45,8 +45,8 @@ uvicorn fhir_backend_auth.app:create_app --factory --reload
 | `SERVER_NAME` | External hostname for JWKS URL |
 | `PREFERRED_URL_SCHEME` | `http` or `https` |
 | `OAUTH_CLIENT_ID` | OAuth client ID (from Epic App Orchard) |
-| `UPSTREAM_TOKEN_URL` | Upstream token endpoint |
-| `UPSTREAM_FHIR_URL` | Upstream FHIR base URL |
+| `UPSTREAM_FHIR_URL` | Upstream FHIR base URL (used for OAuth discovery) |
+| `UPSTREAM_TOKEN_URL` | Optional override for token endpoint (skips discovery) |
 | `OAUTH_SCOPES` | Space-separated system scopes |
 | `JWK_KEY_DIR` | Directory for RSA keypair storage |
 | `REDIS_URL` | Redis connection URL |
@@ -79,6 +79,7 @@ Image: `ghcr.io/uwcirg/fhir-backend-auth`
 ## Notes
 
 - OAuth token acquisition uses [authlib](https://docs.authlib.org/) (`private_key_jwt` / RFC7523).
+- Token endpoint is discovered from `{UPSTREAM_FHIR_URL}/.well-known/smart-configuration`, falling back to `openid-configuration`.
 - Epic Backend Services JWT assertions use **RS384**.
 - RSA keys are generated on first startup if not present in `JWK_KEY_DIR`.
 - `/fhir/` is intended for trusted internal callers; the service owns Epic authentication.

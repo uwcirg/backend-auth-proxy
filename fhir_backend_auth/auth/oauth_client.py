@@ -11,6 +11,7 @@ from fhir_backend_auth.config import Settings
 def create_oauth_client(
     settings: Settings,
     private_key_pem: str,
+    token_endpoint: str,
     transport: AsyncBaseTransport | None = None,
 ) -> AsyncOAuth2Client:
     """Create an AsyncOAuth2Client configured for private_key_jwt."""
@@ -25,6 +26,6 @@ def create_oauth_client(
         **client_kwargs,
     )
     client.register_client_auth_method(
-        PrivateKeyJWT(settings.upstream_token_url, alg=JWT_ALGORITHM)
+        PrivateKeyJWT(token_endpoint, alg=JWT_ALGORITHM)
     )
     return client

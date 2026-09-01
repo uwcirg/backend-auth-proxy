@@ -13,12 +13,14 @@ from fhir_backend_auth.auth.oauth_client import create_oauth_client
 from fhir_backend_auth.auth.token_client import TokenClient
 from fhir_backend_auth.config import Settings
 
+TOKEN_ENDPOINT = "https://epic.example.com/oauth2/token"
+
 
 @pytest.fixture
 def settings(tmp_key_dir):
     return Settings(
         oauth_client_id="test-client-id",
-        upstream_token_url="https://epic.example.com/oauth2/token",
+        upstream_token_url=TOKEN_ENDPOINT,
         oauth_scopes="system/Patient.read",
         jwk_key_dir=tmp_key_dir,
         redis_url="redis://localhost:6379/0",
@@ -45,12 +47,14 @@ def _make_token_client(settings, jwk_manager, fake_redis, transport=None):
     oauth_client = create_oauth_client(
         settings,
         jwk_manager.get_private_key_pem(),
+        TOKEN_ENDPOINT,
         transport=transport,
     )
     return TokenClient(
         settings,
         jwk_manager,
         fake_redis,
+        token_endpoint=TOKEN_ENDPOINT,
         oauth_client=oauth_client,
     )
 
@@ -90,7 +94,7 @@ async def test_token_request_uses_rs384_private_key_jwt(
     assert header["alg"] == JWT_ALGORITHM
     assert decoded["iss"] == settings.oauth_client_id
     assert decoded["sub"] == settings.oauth_client_id
-    assert decoded["aud"] == settings.upstream_token_url
+    assert decoded["aud"] == TOKEN_ENDPOINT
     assert "jti" in decoded
 
     await client.close()

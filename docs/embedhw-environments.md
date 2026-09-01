@@ -68,9 +68,10 @@ Container-only secrets (copy to `fhirbackendauth.env`):
 # Copy to fhirbackendauth.env and modify as necessary
 
 OAUTH_CLIENT_ID=
-UPSTREAM_TOKEN_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
 UPSTREAM_FHIR_URL=https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4
 OAUTH_SCOPES=system/Patient.read system/Observation.read
+# Optional: override discovered token endpoint
+# UPSTREAM_TOKEN_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
 TOKEN_CACHE_KEY=upstream:access_token
 TOKEN_CACHE_BUFFER_SECONDS=60
 LOG_LEVEL=INFO

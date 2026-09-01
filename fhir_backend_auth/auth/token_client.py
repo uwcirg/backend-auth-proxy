@@ -27,14 +27,17 @@ class TokenClient:
         settings: Settings,
         jwk_manager: JWKManager,
         redis: Redis,
+        token_endpoint: str,
         oauth_client: AsyncOAuth2Client | None = None,
     ):
         self.settings = settings
         self.jwk_manager = jwk_manager
         self.redis = redis
+        self._token_endpoint = token_endpoint
         self._oauth_client = oauth_client or create_oauth_client(
             settings,
             jwk_manager.get_private_key_pem(),
+            token_endpoint,
         )
         self._owns_client = oauth_client is None
 
@@ -87,7 +90,7 @@ class TokenClient:
 
     async def _fetch_token(self) -> str:
         token = await self._oauth_client.fetch_token(
-            self.settings.upstream_token_url,
+            self._token_endpoint,
             grant_type="client_credentials",
             scope=self.settings.oauth_scopes,
         )

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fhir_backend_auth.api.fhir import router as fhir_router
 from fhir_backend_auth.auth.jwk_manager import JWKManager
 from fhir_backend_auth.auth.routes import router as auth_router
+from fhir_backend_auth.auth.smart_configuration import resolve_smart_configuration
 from fhir_backend_auth.auth.token_client import TokenClient
 from fhir_backend_auth.config import Settings, get_settings
 from fhir_backend_auth.extensions import close_redis, get_redis, init_redis
@@ -32,16 +33,32 @@ async def lifespan(app: FastAPI):
     await init_redis(settings.redis_url)
 
     http_client = httpx.AsyncClient(timeout=60.0)
+    smart_config = await resolve_smart_configuration(
+        settings,
+        get_redis(),
+        http_client,
+    )
+    app.state.smart_configuration = smart_config
+
     token_client = TokenClient(
         settings=settings,
         jwk_manager=jwk_manager,
         redis=get_redis(),
+        token_endpoint=smart_config.token_endpoint,
     )
 
     app.state.http_client = http_client
     app.state.token_client = token_client
 
-    logger.info("Application startup complete; JWKS URL: %s", settings.jwks_url)
+    logger.info(
+        "Application startup complete; JWKS URL: %s",
+        settings.jwks_url,
+    )
+    logger.info(
+        "OAuth token_endpoint: %s (from %s)",
+        smart_config.token_endpoint,
+        smart_config.discovery_url or "UPSTREAM_TOKEN_URL override",
+    )
     yield
 
     await token_client.close()

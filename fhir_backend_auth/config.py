@@ -4,6 +4,11 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DISCOVERY_PATHS = (
+    "/.well-known/smart-configuration",
+    "/.well-known/openid-configuration",
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -12,9 +17,7 @@ class Settings(BaseSettings):
     preferred_url_scheme: str = "http"
 
     oauth_client_id: str
-    upstream_token_url: str = (
-        "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token"
-    )
+    upstream_token_url: str | None = None
     upstream_fhir_url: str = (
         "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4"
     )
@@ -25,6 +28,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     token_cache_key: str = "upstream:access_token"
     token_cache_buffer_seconds: int = 60
+    oauth_configuration_cache_key: str = "upstream:oauth-configuration"
+    oauth_configuration_cache_ttl_seconds: int = 86400
 
     log_level: str = "INFO"
     testing: bool = False
@@ -35,6 +40,11 @@ class Settings(BaseSettings):
             f"{self.preferred_url_scheme}://{self.server_name}"
             "/.well-known/jwks.json"
         )
+
+    @property
+    def discovery_urls(self) -> list[str]:
+        base = self.upstream_fhir_url.rstrip("/")
+        return [f"{base}{path}" for path in DISCOVERY_PATHS]
 
 
 @lru_cache
