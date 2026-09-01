@@ -12,6 +12,7 @@ def create_oauth_client(
     settings: Settings,
     private_key_pem: str,
     token_endpoint: str,
+    kid: str,
     transport: AsyncBaseTransport | None = None,
 ) -> AsyncOAuth2Client:
     """Create an AsyncOAuth2Client configured for private_key_jwt."""
@@ -26,6 +27,10 @@ def create_oauth_client(
         **client_kwargs,
     )
     client.register_client_auth_method(
-        PrivateKeyJWT(token_endpoint, alg=JWT_ALGORITHM)
+        PrivateKeyJWT(
+            token_endpoint,
+            alg=JWT_ALGORITHM,
+            headers={"kid": kid},
+        )
     )
     return client
