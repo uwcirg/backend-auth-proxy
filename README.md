@@ -7,7 +7,7 @@ FastAPI service that proxies `/fhir/` requests to Epic using Backend Services OA
 1. Copy the example environment file and configure Epic credentials:
 
 ```bash
-cp fhir_backend_auth.env.default .env
+cp fhirbackendauth.env.default fhirbackendauth.env
 ```
 
 2. Register the JWKS URL with Epic App Orchard:
@@ -22,7 +22,13 @@ cp fhir_backend_auth.env.default .env
 docker compose up --build
 ```
 
-Or run locally:
+For local development with a checkout mount and auto-reload:
+
+```bash
+COMPOSE_FILE=docker-compose.yaml:docker-compose.dev.yaml docker compose up --build
+```
+
+Or run locally without Docker:
 
 ```bash
 python -m venv .venv
@@ -60,6 +66,15 @@ curl http://localhost:8000/health
 ```bash
 pytest
 ```
+
+## embedhw-environments
+
+This service is designed to deploy as a Traefik-routed service in
+[embedhw-environments](https://github.com/uwcirg/embedhw-environments).
+See [docs/embedhw-environments.md](docs/embedhw-environments.md) for compose
+snippets, env file templates, and deployment notes.
+
+Image: `ghcr.io/uwcirg/fhir-backend-auth`
 
 ## Notes
 
