@@ -23,6 +23,35 @@ FORWARD_RESPONSE_HEADERS = {
 }
 
 
+def _headers_for_log(headers: httpx.Headers | dict[str, str]) -> dict[str, str]:
+    return {name.lower(): value for name, value in headers.items()}
+
+
+def _build_upstream_request_url(upstream_url: str, params: httpx.QueryParams) -> str:
+    return str(httpx.URL(upstream_url).copy_merge_params(params=params))
+
+
+def _log_upstream_request(
+    method: str,
+    url: str,
+    headers: dict[str, str],
+) -> None:
+    logger.info(
+        "Upstream request: %s %s headers=%s",
+        method,
+        url,
+        _headers_for_log(headers),
+    )
+
+
+def _log_upstream_response(response: httpx.Response) -> None:
+    logger.info(
+        "Upstream response: %s headers=%s",
+        response.status_code,
+        _headers_for_log(response.headers),
+    )
+
+
 @router.api_route(
     "/",
     methods=SUPPORTED_METHODS,
@@ -49,13 +78,20 @@ async def proxy_fhir(request: Request, path: str = "") -> Response:
 
     async def forward(access_token: str) -> httpx.Response:
         headers["Authorization"] = f"Bearer {access_token}"
-        return await http_client.request(
+        request_url = _build_upstream_request_url(
+            upstream_url,
+            request.query_params,
+        )
+        _log_upstream_request(request.method, request_url, headers)
+        response = await http_client.request(
             method=request.method,
             url=upstream_url,
             params=request.query_params,
             content=body if body else None,
             headers=headers,
         )
+        _log_upstream_response(response)
+        return response
 
     access_token = await token_client.get_access_token()
     upstream_response = await forward(access_token)

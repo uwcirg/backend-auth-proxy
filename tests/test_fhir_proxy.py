@@ -1,8 +1,11 @@
+import logging
+
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 import fhir_backend_auth.extensions as ext
+from fhir_backend_auth.api import fhir as fhir_api
 from fhir_backend_auth.app import create_app
 from fhir_backend_auth.auth.oauth_client import create_oauth_client
 
@@ -72,6 +75,44 @@ async def test_fhir_proxy_forwards_request(app_client):
     assert response.status_code == 200
     assert captured["url"] == "https://epic.example.com/api/FHIR/R4/metadata"
     assert captured["auth"] == "Bearer proxy-token"
+
+    await mock_http_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_fhir_proxy_logs_upstream_request_and_response_headers(
+    app_client, caplog
+):
+    client, app, fake_redis = app_client
+    settings = app.state.settings
+
+    await fake_redis.set(
+        settings.token_cache_key,
+        '{"access_token": "proxy-token", "expires_at": 9999999999}',
+    )
+
+    async def upstream_handler(request):
+        return httpx.Response(
+            200,
+            json={"resourceType": "CapabilityStatement"},
+            headers={"Content-Type": "application/fhir+json"},
+        )
+
+    mock_transport = httpx.MockTransport(upstream_handler)
+    mock_http_client = httpx.AsyncClient(transport=mock_transport)
+    app.state.http_client = mock_http_client
+
+    upstream_url = f"{settings.upstream_fhir_url.rstrip('/')}/metadata"
+    with caplog.at_level(logging.INFO, logger=fhir_api.logger.name):
+        response = await client.get("/fhir/metadata")
+
+    assert response.status_code == 200
+    log_text = caplog.text
+    assert "Upstream request: GET" in log_text
+    assert upstream_url in log_text
+    assert "'authorization': 'Bearer proxy-token'" in log_text
+    assert "Upstream response: 200" in log_text
+    assert "'content-type': 'application/fhir+json'" in log_text
 
     await mock_http_client.aclose()
 
