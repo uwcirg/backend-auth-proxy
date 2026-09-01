@@ -9,9 +9,9 @@ import json
 import os
 from pathlib import Path
 
+from authlib.jose import JsonWebKey
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from jose import jwk
 
 JWT_ALGORITHM = "RS384"
 
@@ -115,10 +115,11 @@ class JWKManager:
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo,
             )
-            self._jwk_dict = jwk.RSAKey(
-                algorithm=JWT_ALGORITHM,
-                key=public_pem.decode("utf-8"),
-            ).to_dict()
+            key = JsonWebKey.import_key(
+                public_pem,
+                {"kty": "RSA", "alg": JWT_ALGORITHM, "use": "sig"},
+            )
+            self._jwk_dict = key.as_dict(is_private=False)
         return self._jwk_dict
 
     def get_jwks(self) -> dict:

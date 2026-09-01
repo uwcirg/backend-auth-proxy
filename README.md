@@ -78,6 +78,7 @@ Image: `ghcr.io/uwcirg/fhir-backend-auth`
 
 ## Notes
 
+- OAuth token acquisition uses [authlib](https://docs.authlib.org/) (`private_key_jwt` / RFC7523).
 - Epic Backend Services JWT assertions use **RS384**.
 - RSA keys are generated on first startup if not present in `JWK_KEY_DIR`.
 - `/fhir/` is intended for trusted internal callers; the service owns Epic authentication.

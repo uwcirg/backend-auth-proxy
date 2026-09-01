@@ -4,6 +4,7 @@ from httpx import ASGITransport, AsyncClient
 
 import fhir_backend_auth.extensions as ext
 from fhir_backend_auth.app import create_app
+from fhir_backend_auth.auth.oauth_client import create_oauth_client
 
 
 @pytest.fixture
@@ -99,16 +100,22 @@ async def test_fhir_proxy_retries_on_401(app_client):
             return httpx.Response(401, json={"error": "invalid_token"})
         return httpx.Response(200, json={"resourceType": "Patient"})
 
-    class RoutingTransport(httpx.AsyncBaseTransport):
+    class FhirTransport(httpx.AsyncBaseTransport):
         async def handle_async_request(self, request):
-            if "oauth2/token" in str(request.url):
-                return await token_handler(request)
             return await fhir_handler(request)
 
-    mock_http_client = httpx.AsyncClient(transport=RoutingTransport())
+    mock_http_client = httpx.AsyncClient(transport=FhirTransport())
     app.state.http_client = mock_http_client
-    app.state.token_client._http_client = mock_http_client
-    app.state.token_client._owns_client = False
+
+    token_transport = httpx.MockTransport(
+        lambda request: token_handler(request)
+    )
+    app.state.token_client._oauth_client = create_oauth_client(
+        settings,
+        app.state.jwk_manager.get_private_key_pem(),
+        transport=token_transport,
+    )
+    app.state.token_client._owns_client = True
 
     response = await client.get("/fhir/Patient/123")
     assert response.status_code == 200

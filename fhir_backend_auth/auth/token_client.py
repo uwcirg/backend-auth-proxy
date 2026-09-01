@@ -4,14 +4,13 @@ import asyncio
 import json
 import logging
 import time
-import uuid
 from typing import Any
 
-import httpx
-from jose import jwt
+from authlib.integrations.httpx_client import AsyncOAuth2Client
 from redis.asyncio import Redis
 
-from fhir_backend_auth.auth.jwk_manager import JWT_ALGORITHM, JWKManager
+from fhir_backend_auth.auth.jwk_manager import JWKManager
+from fhir_backend_auth.auth.oauth_client import create_oauth_client
 from fhir_backend_auth.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -28,41 +27,20 @@ class TokenClient:
         settings: Settings,
         jwk_manager: JWKManager,
         redis: Redis,
-        http_client: httpx.AsyncClient | None = None,
+        oauth_client: AsyncOAuth2Client | None = None,
     ):
         self.settings = settings
         self.jwk_manager = jwk_manager
         self.redis = redis
-        self._http_client = http_client
-        self._owns_client = http_client is None
-
-    async def _get_http_client(self) -> httpx.AsyncClient:
-        if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
-        return self._http_client
+        self._oauth_client = oauth_client or create_oauth_client(
+            settings,
+            jwk_manager.get_private_key_pem(),
+        )
+        self._owns_client = oauth_client is None
 
     async def close(self) -> None:
-        if self._owns_client and self._http_client is not None:
-            await self._http_client.aclose()
-            self._http_client = None
-
-    def _build_client_assertion(self) -> str:
-        now = int(time.time())
-        claims = {
-            "iss": self.settings.oauth_client_id,
-            "sub": self.settings.oauth_client_id,
-            "aud": self.settings.upstream_token_url,
-            "jti": str(uuid.uuid4()),
-            "exp": now + 240,
-            "nbf": now,
-            "iat": now,
-        }
-        private_key_pem = self.jwk_manager.get_private_key_pem()
-        return jwt.encode(
-            claims,
-            private_key_pem,
-            algorithm=JWT_ALGORITHM,
-        )
+        if self._owns_client:
+            await self._oauth_client.aclose()
 
     async def _read_cached_token(self) -> str | None:
         cached = await self.redis.get(self.settings.token_cache_key)
@@ -108,22 +86,12 @@ class TokenClient:
         await self.redis.delete(self.settings.token_cache_key)
 
     async def _fetch_token(self) -> str:
-        client = await self._get_http_client()
-        assertion = self._build_client_assertion()
-        response = await client.post(
+        token = await self._oauth_client.fetch_token(
             self.settings.upstream_token_url,
-            data={
-                "grant_type": "client_credentials",
-                "client_assertion_type": (
-                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-                ),
-                "client_assertion": assertion,
-                "scope": self.settings.oauth_scopes,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            grant_type="client_credentials",
+            scope=self.settings.oauth_scopes,
         )
-        response.raise_for_status()
-        return await self._cache_token(response.json())
+        return await self._cache_token(token)
 
     async def get_access_token(self) -> str:
         cached = await self._read_cached_token()

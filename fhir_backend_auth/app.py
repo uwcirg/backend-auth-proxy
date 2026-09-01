@@ -36,7 +36,6 @@ async def lifespan(app: FastAPI):
         settings=settings,
         jwk_manager=jwk_manager,
         redis=get_redis(),
-        http_client=http_client,
     )
 
     app.state.http_client = http_client

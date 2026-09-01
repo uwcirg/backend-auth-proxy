@@ -1,13 +1,15 @@
 import json
 import time
-from unittest.mock import AsyncMock
+from urllib.parse import parse_qs
 
 import fakeredis.aioredis
 import httpx
 import pytest
-from jose import jwt
+from authlib.jose import jwt
+from cryptography.hazmat.primitives import serialization
 
 from fhir_backend_auth.auth.jwk_manager import JWT_ALGORITHM, JWKManager
+from fhir_backend_auth.auth.oauth_client import create_oauth_client
 from fhir_backend_auth.auth.token_client import TokenClient
 from fhir_backend_auth.config import Settings
 
@@ -39,17 +41,59 @@ async def fake_redis():
     await client.aclose()
 
 
-def test_client_assertion_uses_rs384(settings, jwk_manager):
-    client = TokenClient(settings, jwk_manager, redis=AsyncMock())
-    assertion = client._build_client_assertion()
-    header = jwt.get_unverified_header(assertion)
-    claims = jwt.get_unverified_claims(assertion)
+def _make_token_client(settings, jwk_manager, fake_redis, transport=None):
+    oauth_client = create_oauth_client(
+        settings,
+        jwk_manager.get_private_key_pem(),
+        transport=transport,
+    )
+    return TokenClient(
+        settings,
+        jwk_manager,
+        fake_redis,
+        oauth_client=oauth_client,
+    )
+
+
+@pytest.mark.asyncio
+async def test_token_request_uses_rs384_private_key_jwt(
+    settings, jwk_manager, fake_redis
+):
+    captured = {}
+
+    async def handler(request):
+        captured["body"] = request.content.decode()
+        return httpx.Response(
+            200,
+            json={"access_token": "fresh-token", "expires_in": 3600},
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
+
+    token = await client.get_access_token()
+    assert token == "fresh-token"
+
+    form = parse_qs(captured["body"])
+    assert form["grant_type"] == ["client_credentials"]
+    assert form["client_assertion_type"] == [
+        "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+    ]
+    assertion = form["client_assertion"][0]
+    public_pem = jwk_manager.get_public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    decoded = jwt.decode(assertion, public_pem)
+    header = decoded.header
 
     assert header["alg"] == JWT_ALGORITHM
-    assert claims["iss"] == settings.oauth_client_id
-    assert claims["sub"] == settings.oauth_client_id
-    assert claims["aud"] == settings.upstream_token_url
-    assert "jti" in claims
+    assert decoded["iss"] == settings.oauth_client_id
+    assert decoded["sub"] == settings.oauth_client_id
+    assert decoded["aud"] == settings.upstream_token_url
+    assert "jti" in decoded
+
+    await client.close()
 
 
 @pytest.mark.asyncio
@@ -60,14 +104,15 @@ async def test_cache_hit_skips_token_request(settings, jwk_manager, fake_redis):
         json.dumps({"access_token": "cached-token", "expires_at": expires_at}),
     )
 
-    http_client = AsyncMock()
-    client = TokenClient(
-        settings, jwk_manager, fake_redis, http_client=http_client
+    transport = httpx.MockTransport(
+        lambda request: pytest.fail("token endpoint should not be called")
     )
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
 
     token = await client.get_access_token()
     assert token == "cached-token"
-    http_client.post.assert_not_called()
+
+    await client.close()
 
 
 @pytest.mark.asyncio
@@ -83,11 +128,7 @@ async def test_cache_miss_fetches_and_stores_token(
         return token_response
 
     transport = httpx.MockTransport(handler)
-    http_client = httpx.AsyncClient(transport=transport)
-
-    client = TokenClient(
-        settings, jwk_manager, fake_redis, http_client=http_client
-    )
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
 
     token = await client.get_access_token()
     assert token == "fresh-token"
@@ -97,7 +138,7 @@ async def test_cache_miss_fetches_and_stores_token(
     assert payload["access_token"] == "fresh-token"
     assert payload["expires_at"] > int(time.time())
 
-    await http_client.aclose()
+    await client.close()
 
 
 @pytest.mark.asyncio
@@ -117,11 +158,9 @@ async def test_expired_cache_refreshes_token(settings, jwk_manager, fake_redis):
         return token_response
 
     transport = httpx.MockTransport(handler)
-    http_client = httpx.AsyncClient(transport=transport)
-    client = TokenClient(
-        settings, jwk_manager, fake_redis, http_client=http_client
-    )
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
 
     token = await client.get_access_token()
     assert token == "new-token"
-    await http_client.aclose()
+
+    await client.close()
