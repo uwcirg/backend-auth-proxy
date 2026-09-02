@@ -95,6 +95,7 @@ class TokenClient:
             self._token_endpoint,
             grant_type="client_credentials",
             scope=self.settings.oauth_scopes,
+            client_id=self.settings.oauth_client_id,
         )
         return await self._cache_token(token)
 
