@@ -6,6 +6,7 @@ from httpx import AsyncBaseTransport
 
 from fhir_backend_auth.auth.jwk_manager import JWT_ALGORITHM
 from fhir_backend_auth.config import Settings
+from fhir_backend_auth.http_logging import LoggingTransport
 
 
 def create_oauth_client(
@@ -16,9 +17,9 @@ def create_oauth_client(
     transport: AsyncBaseTransport | None = None,
 ) -> AsyncOAuth2Client:
     """Create an AsyncOAuth2Client configured for private_key_jwt."""
-    client_kwargs = {}
-    if transport is not None:
-        client_kwargs["transport"] = transport
+    client_kwargs = {
+        "transport": LoggingTransport(transport, label="Token"),
+    }
 
     client = AsyncOAuth2Client(
         client_id=settings.oauth_client_id,
