@@ -80,9 +80,7 @@ async def test_fhir_proxy_forwards_request(app_client):
 
 
 @pytest.mark.asyncio
-async def test_fhir_proxy_logs_upstream_request_and_response_headers(
-    app_client, caplog
-):
+async def test_fhir_proxy_does_not_log_on_success(app_client, caplog):
     client, app, fake_redis = app_client
     settings = app.state.settings
 
@@ -102,17 +100,50 @@ async def test_fhir_proxy_logs_upstream_request_and_response_headers(
     mock_http_client = httpx.AsyncClient(transport=mock_transport)
     app.state.http_client = mock_http_client
 
-    upstream_url = f"{settings.upstream_fhir_url.rstrip('/')}/metadata"
     with caplog.at_level(logging.INFO, logger=http_logging_logger.name):
         response = await client.get("/fhir/metadata")
 
     assert response.status_code == 200
+    assert "Upstream request:" not in caplog.text
+    assert "Upstream response:" not in caplog.text
+
+    await mock_http_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_fhir_proxy_logs_upstream_request_and_response_on_error(
+    app_client, caplog
+):
+    client, app, fake_redis = app_client
+    settings = app.state.settings
+
+    await fake_redis.set(
+        settings.token_cache_key,
+        '{"access_token": "proxy-token", "expires_at": 9999999999}',
+    )
+
+    async def upstream_handler(request):
+        return httpx.Response(
+            400,
+            json={"error": "bad_request"},
+            headers={"Content-Type": "application/json"},
+        )
+
+    mock_transport = httpx.MockTransport(upstream_handler)
+    mock_http_client = httpx.AsyncClient(transport=mock_transport)
+    app.state.http_client = mock_http_client
+
+    upstream_url = f"{settings.upstream_fhir_url.rstrip('/')}/metadata"
+    with caplog.at_level(logging.INFO, logger=http_logging_logger.name):
+        response = await client.get("/fhir/metadata")
+
+    assert response.status_code == 400
     log_text = caplog.text
     assert "Upstream request: GET" in log_text
     assert upstream_url in log_text
     assert "'authorization': 'Bearer proxy-token'" in log_text
-    assert "Upstream response: 200" in log_text
-    assert "'content-type': 'application/fhir+json'" in log_text
+    assert "Upstream response: 400" in log_text
+    assert "bad_request" in log_text
 
     await mock_http_client.aclose()
 

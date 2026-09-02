@@ -23,7 +23,7 @@ def body_for_log(body: bytes | str | None, limit: int = 2000) -> str:
     return text
 
 
-def log_http_request(
+def _log_http_request(
     label: str,
     method: str,
     url: str,
@@ -40,7 +40,7 @@ def log_http_request(
     )
 
 
-def log_http_response(
+def _log_http_response(
     label: str,
     response: httpx.Response,
     body: bytes | None = None,
@@ -54,8 +54,24 @@ def log_http_response(
     )
 
 
+def log_http_exchange(
+    label: str,
+    method: str,
+    url: str,
+    request_headers: httpx.Headers | dict[str, str],
+    request_body: bytes | str | None,
+    response: httpx.Response,
+    response_body: bytes | None = None,
+) -> None:
+    """Log request and response details only when the response is not 200 OK."""
+    if response.status_code == 200:
+        return
+    _log_http_request(label, method, url, request_headers, request_body)
+    _log_http_response(label, response, response_body)
+
+
 class LoggingTransport(httpx.AsyncBaseTransport):
-    """Log HTTP exchanges, then delegate to an inner transport."""
+    """Log HTTP exchanges on non-200 responses, then delegate to an inner transport."""
 
     def __init__(
         self,
@@ -66,17 +82,14 @@ class LoggingTransport(httpx.AsyncBaseTransport):
         self._label = label
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        log_http_request(
+        response = await self._transport.handle_async_request(request)
+        body = await response.aread()
+        log_http_exchange(
             self._label,
             request.method,
             str(request.url),
             request.headers,
             request.content,
-        )
-        response = await self._transport.handle_async_request(request)
-        body = await response.aread()
-        log_http_response(
-            self._label,
             response,
             body,
         )

@@ -106,6 +106,29 @@ async def test_token_request_uses_rs384_private_key_jwt(
 
 
 @pytest.mark.asyncio
+async def test_token_request_does_not_log_on_success(
+    settings, jwk_manager, fake_redis, caplog
+):
+    async def handler(request):
+        return httpx.Response(
+            200,
+            json={"access_token": "fresh-token", "expires_in": 3600},
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = _make_token_client(settings, jwk_manager, fake_redis, transport)
+
+    with caplog.at_level(logging.INFO, logger=http_logging_logger.name):
+        token = await client.get_access_token()
+
+    assert token == "fresh-token"
+    assert "Token request:" not in caplog.text
+    assert "Token response:" not in caplog.text
+
+    await client.close()
+
+
+@pytest.mark.asyncio
 async def test_token_request_logs_request_and_response_on_error(
     settings, jwk_manager, fake_redis, caplog
 ):
