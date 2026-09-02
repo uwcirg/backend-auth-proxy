@@ -36,6 +36,7 @@ class JWKManager:
         }
 
     def generate_keys(self, key_size: int = 2048) -> None:
+        """Generate a new RSA keypair and persist it to disk."""
         private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=key_size,
@@ -63,6 +64,7 @@ class JWKManager:
         self._jwk_dict = None
 
     def load_keys(self) -> None:
+        """Load an existing RSA keypair from disk."""
         key_paths = self._get_key_paths()
         if not os.path.exists(key_paths["private"]):
             raise FileNotFoundError(
@@ -84,6 +86,7 @@ class JWKManager:
         self._jwk_dict = None
 
     def get_or_create_keys(self) -> None:
+        """Load keys from disk, generating a new keypair if none exists."""
         key_paths = self._get_key_paths()
         if os.path.exists(key_paths["private"]):
             self.load_keys()
@@ -123,6 +126,7 @@ class JWKManager:
         return self._jwk_dict
 
     def get_kid(self) -> str:
+        """Return a stable key ID derived from the public JWK."""
         jwk_dict = self.get_jwk_dict()
         if "kid" not in jwk_dict:
             key_str = json.dumps(jwk_dict, sort_keys=True)
@@ -132,6 +136,7 @@ class JWKManager:
         return jwk_dict["kid"]
 
     def get_jwks(self) -> dict:
+        """Return the public key set for the /.well-known/jwks.json endpoint."""
         jwk_dict = dict(self.get_jwk_dict())
         jwk_dict["kid"] = self.get_kid()
         jwk_dict["alg"] = JWT_ALGORITHM

@@ -16,7 +16,10 @@ def create_oauth_client(
     kid: str,
     transport: AsyncBaseTransport | None = None,
 ) -> AsyncOAuth2Client:
-    """Create an AsyncOAuth2Client configured for private_key_jwt."""
+    """Create an AsyncOAuth2Client for private_key_jwt Backend Services auth.
+
+    Registers a logging transport and includes the JWKS key ID in client assertions.
+    """
     client_kwargs = {
         "transport": LoggingTransport(transport, label="Token"),
     }

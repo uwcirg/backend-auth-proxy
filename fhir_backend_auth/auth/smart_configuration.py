@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SmartConfiguration:
+    """OAuth server metadata discovered from SMART or OpenID well-known endpoints."""
+
     token_endpoint: str
     issuer: str | None = None
     authorization_endpoint: str | None = None

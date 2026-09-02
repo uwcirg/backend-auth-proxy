@@ -1,3 +1,5 @@
+"""Tests for the FHIR proxy and application integration."""
+
 import logging
 
 import httpx
@@ -12,6 +14,7 @@ from fhir_backend_auth.http_logging import logger as http_logging_logger
 
 @pytest.fixture
 async def app_client(tmp_key_dir, monkeypatch):
+    """Yield an ASGI test client with lifespan, fake Redis, and app state wired up."""
     monkeypatch.setenv("OAUTH_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("JWK_KEY_DIR", tmp_key_dir)
 
@@ -150,6 +153,7 @@ async def test_fhir_proxy_logs_upstream_request_and_response_on_error(
 
 @pytest.mark.asyncio
 async def test_fhir_proxy_retries_on_401(app_client):
+    """Invalidate the cached token and retry once when upstream returns 401."""
     client, app, fake_redis = app_client
     settings = app.state.settings
 

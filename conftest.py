@@ -1,3 +1,5 @@
+"""Shared pytest configuration and environment overrides."""
+
 import os
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def test_env(tmp_key_dir, monkeypatch):
+    """Set default env vars for tests, including UPSTREAM_TOKEN_URL to skip discovery."""
     monkeypatch.setenv("OAUTH_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("JWK_KEY_DIR", tmp_key_dir)
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/15")

@@ -99,6 +99,7 @@ class TokenClient:
         return await self._cache_token(token)
 
     async def get_access_token(self) -> str:
+        """Return a cached access token, refreshing under a Redis lock when needed."""
         cached = await self._read_cached_token()
         if cached:
             return cached

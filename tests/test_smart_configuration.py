@@ -1,3 +1,5 @@
+"""Tests for SMART and OpenID OAuth configuration discovery."""
+
 import json
 
 import fakeredis.aioredis
@@ -127,6 +129,7 @@ async def test_upstream_token_url_override_skips_http(settings, fake_redis):
 
 @pytest.mark.asyncio
 async def test_resolve_uses_redis_cache(settings, fake_redis):
+    """Return cached OAuth configuration without calling well-known endpoints."""
     cached = SmartConfiguration(
         token_endpoint=TOKEN_ENDPOINT,
         discovery_url=f"{UPSTREAM_FHIR_URL}/.well-known/smart-configuration",
@@ -148,6 +151,7 @@ async def test_resolve_uses_redis_cache(settings, fake_redis):
 
 @pytest.mark.asyncio
 async def test_resolve_fetches_and_caches_on_miss(settings, fake_redis):
+    """Discover OAuth configuration over HTTP and persist it in Redis on cache miss."""
     async def handler(request):
         return httpx.Response(
             200,

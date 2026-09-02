@@ -11,6 +11,8 @@ DISCOVERY_PATHS = (
 
 
 class Settings(BaseSettings):
+    """Environment-driven configuration for the FHIR backend auth proxy."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     server_name: str = "localhost:8000"
@@ -49,4 +51,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Return a cached Settings instance loaded from the environment."""
     return Settings()

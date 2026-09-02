@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _configure_logging(settings: Settings) -> None:
+    """Configure root logging from application settings."""
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
@@ -26,6 +27,7 @@ def _configure_logging(settings: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Initialize keys, Redis, OAuth discovery, and clients on startup; tear down on shutdown."""
     settings: Settings = app.state.settings
     jwk_manager: JWKManager = app.state.jwk_manager
 
