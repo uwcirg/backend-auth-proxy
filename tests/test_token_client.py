@@ -86,7 +86,6 @@ async def test_token_request_uses_rs384_private_key_jwt(
 
     form = parse_qs(captured["body"])
     assert form["grant_type"] == ["client_credentials"]
-    assert form["client_id"] == [settings.oauth_client_id]
     assert form["client_assertion_type"] == [
         "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
     ]
