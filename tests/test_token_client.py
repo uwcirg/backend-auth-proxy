@@ -102,6 +102,7 @@ async def test_token_request_uses_rs384_private_key_jwt(
     assert decoded["iss"] == settings.oauth_client_id
     assert decoded["sub"] == settings.oauth_client_id
     assert decoded["aud"] == TOKEN_ENDPOINT
+    assert decoded["exp"] - decoded["iat"] == settings.client_assertion_expires_seconds
     assert "jti" in decoded
 
     await client.close()

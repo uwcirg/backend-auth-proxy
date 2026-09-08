@@ -48,6 +48,7 @@ uvicorn fhir_backend_auth.app:create_app --factory --reload
 | `UPSTREAM_FHIR_URL` | Upstream FHIR base URL (used for OAuth discovery) |
 | `UPSTREAM_TOKEN_URL` | Optional override for token endpoint (skips discovery) |
 | `OAUTH_SCOPES` | Space-separated system scopes |
+| `CLIENT_ASSERTION_EXPIRES_SECONDS` | Client assertion JWT lifetime (default 300; Epic max 5 min) |
 | `JWK_KEY_DIR` | Directory for RSA keypair storage |
 | `REDIS_URL` | Redis connection URL |
 | `TOKEN_CACHE_KEY` | Redis key for cached access token |

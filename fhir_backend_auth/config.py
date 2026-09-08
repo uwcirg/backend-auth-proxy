@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4"
     )
     oauth_scopes: str = "system/Patient.read system/Observation.read"
+    client_assertion_expires_seconds: int = 300
 
     jwk_key_dir: str = "/data/jwks"
 
